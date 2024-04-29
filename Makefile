@@ -16,3 +16,11 @@ run_producers:
 run_pipeline:
 	@echo "$(GREEN) [RUNNING] Bytewax Pipeline $(RESET)"
 	@bash -c "RUST_BACKTRACE=1 poetry run python -m bytewax.run src/start:flow"
+
+clean_vdb:
+	@echo "$(RED) [CLEANING] Upstash Vector DB $(RESET)"
+	@bash -c "poetry run python -m src.helpers clean_vectordb"
+
+run_ui:
+	@echo "$(GREEN) [RUNNING] Streamlit UI interface $(RESET)"
+	@bash -c "poetry run streamlit run ui.py"
