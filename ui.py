@@ -24,7 +24,7 @@ os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 v_index = Index(url=settings.UPSTASH_VECTOR_ENDPOINT, token=settings.UPSTASH_VECTOR_KEY)
 
-st.title("Upstash Real-Time News Search")
+st.title("PoC Live News Media Monitor")
 results_placeholder = st.empty()
 
 
