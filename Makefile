@@ -12,3 +12,7 @@ install:
 run_producers:
 	@echo "$(GREEN) [RUNNING] Data Gathering Pipeline Kafka Producers $(RESET)"
 	@bash -c "poetry run python -m src.producer"
+
+run_pipeline:
+	@echo "$(GREEN) [RUNNING] Bytewax Pipeline $(RESET)"
+	@bash -c "RUST_BACKTRACE=1 poetry run python -m bytewax.run src/start:flow"

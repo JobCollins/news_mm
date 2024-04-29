@@ -19,18 +19,103 @@ from typing import Any, Dict, List, Optional, Union
 from uuid import uuid4
 
 from dateutil import parser
-# from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel, Field, field_validator
-# from unstructured.staging.huggingface import chunk_by_attention_window
+from unstructured.staging.huggingface import chunk_by_attention_window
 
 from cleaners import clean_full, normalize_whitespace, remove_html_tags
-# from embeddings import TextEmbedder
+from embeddings import TextEmbedder
 
 logger = logging.getLogger(__name__)
+
+RECURSIVE_SPLITTER = RecursiveCharacterTextSplitter()
+
 
 class DocumentSource(BaseModel):
     id: Optional[str]
     name: str
+
+class RefinedDocument(BaseModel):
+    doc_id: str
+    full_text: str = ""
+    metadata: dict = {}
+
+    @classmethod
+    def from_common(cls, common: "CommonDocument") -> "RefinedDocument":
+        """Converts a CommonDocument to refined document format."""
+        refined = RefinedDocument(doc_id=str(common.article_id))
+        refined.metadata = {
+            "title": common.title,
+            "url": common.url,
+            "published_at": common.published_at,
+            "source_name": common.source_name,
+            "author": common.author,
+            "image_url": common.image_url,
+        }
+        refined.full_text = ".".join([common.title, common.description])
+        return refined
+
+class ChunkedDocument(BaseModel):
+    doc_id: str
+    chunk_id: str
+    full_raw_text: str
+    text: str
+    metadata: Dict[str, Union[str, Any]]
+
+    @classmethod
+    def from_refined(
+        cls, refined_doc: RefinedDocument, embedding_model: TextEmbedder
+    ) -> list["ChunkedDocument"]:
+        chunks = ChunkedDocument.chunkenize(refined_doc.full_text, embedding_model)
+
+        return [
+            cls(
+                doc_id=refined_doc.doc_id,
+                chunk_id=hashlib.md5(chunk.encode()).hexdigest(),
+                full_raw_text=refined_doc.full_text,
+                text=chunk,
+                metadata=refined_doc.metadata,
+            )
+            for chunk in chunks
+        ]
+
+    @staticmethod
+    def chunkenize(text: str, embedding_model: TextEmbedder) -> list[str]:
+        text_sections = RECURSIVE_SPLITTER.split_text(text=text)
+        chunks = []
+        for text_section in text_sections:
+            chunks.extend(
+                chunk_by_attention_window(text_section, embedding_model.tokenizer)
+            )
+
+        return chunks
+
+class EmbeddedDocument(BaseModel):
+    doc_id: str
+    chunk_id: str
+    full_raw_text: str
+    text: str
+    embeddings: List[float]
+    metadata: Dict[str, Union[str, Any]] = {}
+
+    @classmethod
+    def from_chunked(
+        cls, chunked_doc: ChunkedDocument, embedding_model: TextEmbedder
+    ) -> "EmbeddedDocument":
+        return cls(
+            doc_id=chunked_doc.doc_id,
+            chunk_id=chunked_doc.chunk_id,
+            full_raw_text=chunked_doc.full_raw_text,
+            text=chunked_doc.text,
+            embeddings=embedding_model(chunked_doc.text, to_list=True),
+            metadata=chunked_doc.metadata,
+        )
+
+    def to_payload(self) -> tuple[str, List[float], dict]:
+        return (self.chunk_id, self.embeddings, self.metadata)
+
+    def __repr__(self) -> str:
+        return f"EmbeddedDocument(doc_id={self.doc_id}, chunk_id={self.chunk_id})"
 
 
 class CommonDocument(BaseModel):
