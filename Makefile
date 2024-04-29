@@ -8,3 +8,7 @@ install:
 	@echo "Installing Packages"
 	@echo "Changing to pyproject.toml location..."
 	@bash -c " PYTHON_KEYRING_BACKEND=keyring.backends.fail.Keyring poetry install"
+
+run_producers:
+	@echo "$(GREEN) [RUNNING] Data Gathering Pipeline Kafka Producers $(RESET)"
+	@bash -c "poetry run python -m src.producer"
